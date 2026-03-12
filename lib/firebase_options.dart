@@ -15,7 +15,7 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBv1VIZS7wDVejar8nCaHeWbD3KoXMw-E0',
+    apiKey: 'REDACTED',
     appId: '1:871964697095:android:8bca4e3da3134e1f0b40a2',
     messagingSenderId: '871964697095',
     projectId: 'kigali-city-app-10857',

@@ -1,0 +1,3 @@
+# Copy to android/key.properties (this file is gitignored)
+# Keep real values out of version control.
+MAPS_API_KEY=YOUR_ANDROID_MAPS_API_KEY
