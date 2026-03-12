@@ -123,6 +123,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 decoration: const InputDecoration(
                     hintText: 'Full name',
                     prefixIcon: Icon(Icons.person_outline)),
+                onChanged: (_) => context.read<ap.AuthProvider>().clearError(),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
                     return 'Full name is required';

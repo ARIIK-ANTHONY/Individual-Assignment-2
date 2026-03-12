@@ -118,6 +118,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: const InputDecoration(
                       hintText: 'Email address',
                       prefixIcon: Icon(Icons.email_outlined)),
+                  onChanged: (_) => context.read<ap.AuthProvider>().clearError(),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Email is required';
                     if (!v.contains('@')) return 'Enter a valid email';
