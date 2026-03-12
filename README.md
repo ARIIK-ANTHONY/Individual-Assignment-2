@@ -1,137 +1,172 @@
 # Kigali City Services & Places Directory
 
-Flutter mobile app for discovering and managing public services and lifestyle places in Kigali.
+A Flutter mobile app that helps Kigali residents find and navigate to essential services and lifestyle spots — hospitals, police stations, libraries, restaurants, cafés, parks, and more. Built with Firebase on the backend and Provider for state management, the app lets authenticated users browse a live directory, add their own listings, and get turn-by-turn directions straight from a listing's detail page.
 
-## Features
+---
 
-- Firebase Authentication (email/password)
-- Email verification flow before full access
-- Firestore-backed user profiles (`users` collection)
-- Listings CRUD (`listings` collection)
-- Real-time directory updates with Provider state management
-- Search by name + category filtering
-- Detail page with embedded Google Map marker
-- Launch external Google Maps navigation
-- Reviews with aggregated listing rating/count
-- Bottom navigation: Directory, My Listings, Map View, Settings
-- Settings with profile info and local notification toggle
+## What the App Does
+
+When you open the app you land on a searchable directory of places. You can filter by category, tap any listing to open a detail page with an embedded map, and hit "Get Directions" to hand off navigation to Google Maps. If you want to contribute, you create an account, verify your email, and start adding listings that immediately appear in the shared directory for everyone. You can edit or delete only your own listings — both in the app and enforced server-side by Firestore rules.
+
+Key features at a glance:
+
+- **Authentication** — email/password signup and login, email verification enforced before entry, Firestore user profile created on signup
+- **Directory** — real-time listing feed with live search by name and one-tap category filters
+- **My Listings** — personal CRUD view; create, edit, and delete your own entries
+- **Detail & Map** — embedded Google Map marker for each listing, plus a navigation button that launches Google Maps directions
+- **Map View** — full-screen map showing all listings as markers; tapping one previews the card and lets you jump to the detail page
+- **Settings** — shows your profile name, email, verification status, and a toggle for location notification preferences
+- **Reviews** — leave a star rating and comment on any listing; aggregate rating updates live via a Firestore transaction
+
+---
 
 ## Tech Stack
 
-- Flutter
-- Provider (state management)
-- Firebase Auth
-- Cloud Firestore
-- google_maps_flutter
-- url_launcher
+| Layer | Tool |
+|---|---|
+| Framework | Flutter (Dart) |
+| Auth | Firebase Authentication |
+| Database | Cloud Firestore |
+| State management | Provider (`ChangeNotifier`) |
+| Maps | google_maps_flutter |
+| Navigation launch | url_launcher |
+| Location | geolocator |
 
-## Project Structure
+---
 
-```text
-lib/
-  models/        # Firestore data models (Listing, Review, UserProfile)
-  services/      # Firebase/Auth/Firestore data access layer
-  providers/     # App state + business logic (AuthProvider, ListingsProvider)
-  screens/       # UI pages and flows
-  theme/         # App theme and constants
+## Architecture
+
+The project follows a strict layered architecture so no UI widget ever touches Firebase directly:
+
+```
+Firebase / Auth
+    ↓
+  services/          ← AuthService, ListingService (all Firestore + Auth calls live here)
+    ↓
+  providers/         ← AuthProvider, ListingsProvider (state, streams, CRUD methods)
+    ↓
+  screens/           ← UI reads from providers via Consumer / context.watch
 ```
 
-Architecture flow:
+### Project structure
 
-`Firestore/Auth -> services -> providers -> UI`
+```
+lib/
+  models/       ListingModel, ReviewModel, UserProfile — Firestore DTOs
+  services/     AuthService, ListingService — Firebase access layer
+  providers/    AuthProvider, ListingsProvider — app state via ChangeNotifier
+  screens/      auth/, directory/, listings/, map/, setting/
+  theme/        AppTheme, AppConstants
+```
 
-UI widgets do not directly perform Firestore CRUD.
+---
 
-## Firestore Data Model
+## Firestore Schema
 
 ### `users/{uid}`
+Keyed by Firebase Auth UID for a direct one-to-one mapping. Stores the user's display name, normalized email, account creation timestamp, and their notification preference toggle.
 
-- `email` (string)
-- `displayName` (string)
-- `createdAt` (timestamp)
-- `notificationsEnabled` (bool)
+| Field | Type | Notes |
+|---|---|---|
+| `email` | string | normalized to lowercase |
+| `displayName` | string | |
+| `createdAt` | timestamp | |
+| `notificationsEnabled` | bool | default true |
 
 ### `listings/{listingId}`
+The core of the app. Each document powers a directory card, a detail page, and a map marker from a single record — no extra reads needed.
 
-- `name` (string)
-- `category` (string)
-- `address` (string)
-- `contactNumber` (string)
-- `description` (string)
-- `latitude` (double)
-- `longitude` (double)
-- `createdBy` (string, UID)
-- `createdByName` (string)
-- `createdAt` (timestamp)
-- `rating` (double)
-- `reviewCount` (int)
+| Field | Type | Notes |
+|---|---|---|
+| `name` | string | |
+| `category` | string | Hospital, Restaurant, Café, etc. |
+| `address` | string | |
+| `contactNumber` | string | |
+| `description` | string | |
+| `latitude` / `longitude` | double | validated to Rwanda bounds on write |
+| `createdBy` | string | UID — used for ownership checks |
+| `createdByName` | string | denormalized for display |
+| `createdAt` | timestamp | |
+| `rating` | double | aggregate, updated via transaction |
+| `reviewCount` | int | aggregate |
 
 ### `reviews/{reviewId}`
+Kept separate from listings so detail-page review streams don't bloat the directory feed. Review writes trigger a Firestore transaction that atomically recalculates the parent listing's `rating` and `reviewCount`.
 
-- `listingId` (string)
-- `userId` (string, UID)
-- `userName` (string)
-- `rating` (double)
-- `comment` (string)
-- `createdAt` (timestamp)
+| Field | Type |
+|---|---|
+| `listingId` | string |
+| `userId` | string (UID) |
+| `userName` | string |
+| `rating` | double |
+| `comment` | string |
+| `createdAt` | timestamp |
 
-## Firebase Security Rules
+---
 
-- `users`: owner-only access
-- `listings`: public read, owner-managed CRUD, controlled aggregate field update for reviews
-- `reviews`: public read, authenticated owner write/update/delete
+## Security Rules
 
-Rules file: `firestore.rules`
+Rules are in `firestore.rules`. The core logic:
 
-## Setup
+- **users** — a user can only read and write their own profile document (`request.auth.uid == userId`)
+- **listings** — anyone can read; only the creator can update or delete (`resource.data.createdBy == request.auth.uid`); any signed-in user may update only the `rating` and `reviewCount` aggregate fields
+- **reviews** — public read; only the reviewer can create, update, or delete their own review
+- Everything else is denied by default
 
-1. Install Flutter SDK and Android Studio.
-2. Create Firebase project.
-3. Enable Authentication: Email/Password.
-4. Add Android app in Firebase with package:
-	- `com.example.individual_assignment2`
-5. Download `google-services.json` to:
-	- `android/app/google-services.json`
-6. Ensure Maps API key exists in:
-	- `android/app/src/main/AndroidManifest.xml`
-7. Install dependencies:
+---
 
-```bash
-flutter pub get
-```
+## State Management
 
-8. Deploy Firestore rules:
+I chose Provider because it integrates cleanly with Flutter's widget tree and keeps things readable without overengineering for a project of this scale.
 
-```bash
-firebase deploy --only firestore:rules
-```
+**AuthProvider** listens to Firebase's `authStateChanges()` stream and drives the `AuthWrapper` router. It exposes auth status, the current user object, the Firestore user profile, and all auth methods. Loading and error states are tracked with an enum and surfaced as user-readable strings.
 
-9. Run app on emulator/device:
+**ListingsProvider** subscribes to two Firestore streams on startup — one for all listings (Directory + Map) and one scoped to the current user's UID (My Listings). Search and category filtering happen in-memory on the cached stream data, so the UI responds instantly without extra network calls. CRUD operations go through `ListingService` and errors are caught and exposed to whichever screen triggered them.
 
-```bash
-flutter run -d emulator-5554
-```
+---
 
-## Demo Video Checklist (7-12 min)
+## Getting Started
 
-- Sign up, login, logout, email verification
-- Create listing
-- Edit listing
-- Delete listing
-- Search + filter
-- Detail page map marker
-- Navigation launch to Google Maps
-- Show Firebase Console changes live
-- Show key provider/service files while explaining logic
+**Prerequisites:** Flutter SDK, Android Studio, a Firebase project with Email/Password auth enabled, and a Google Maps API key.
 
-## Assignment Docs
+1. Clone the repo.
 
-- Rubric evidence map: `docs/rubric_evidence_checklist.md`
-- Demo run script: `docs/demo_video_runbook.md`
-- Submission quality checklist: `docs/submission_bundle_checklist.md`
-- Repository walkthrough notes: `docs/repository_walkthrough_notes.md`
+2. Copy the key template and fill in your values:
+  ```bash
+  cp android/key.properties.example android/key.properties
+  # edit android/key.properties with your MAPS_API_KEY
+  ```
 
-## Notes
+3. Place your `google-services.json` from the Firebase Console into `android/app/`.
 
-- App is intended for Android emulator/physical device execution.
-- For best grading, keep incremental commits with meaningful messages.
+4. Install dependencies:
+  ```bash
+  flutter pub get
+  ```
+
+5. Deploy Firestore security rules:
+  ```bash
+  firebase deploy --only firestore:rules
+  ```
+
+6. Run on emulator or device:
+  ```bash
+  flutter run -d emulator-5554
+  ```
+
+> The app is designed and tested for Android. Web execution is not supported.
+
+---
+
+## Demo Video Coverage
+
+The 7–12 minute demo covers:
+
+1. Sign up → email verification → login
+2. Create a listing (coordinates auto-detected from device)
+3. Edit the listing, confirm change in Firestore Console
+4. Delete the listing, confirm removal in Firestore Console
+5. Search by name and filter by category
+6. Open a listing detail — show map marker coordinates from Firestore
+7. Launch Google Maps navigation from the detail page
+8. Walk through `listing_service.dart` → `listings_provider.dart` → `directory_screen.dart` to explain data flow
