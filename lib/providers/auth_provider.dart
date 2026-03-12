@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import '../services/auth_service.dart';
 import '../models/user_profile.dart';
 
@@ -160,6 +159,9 @@ class AuthProvider extends ChangeNotifier {
         return 'An account already exists with this email.';
       case 'invalid-email':
         return 'The email address is not valid.';
+      case 'invalid-credential':
+      case 'invalid-login-credentials':
+        return 'Email or password is incorrect. Please try again.';
       case 'weak-password':
         return 'Password must be at least 6 characters.';
       case 'user-not-found':

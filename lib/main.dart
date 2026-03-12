@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
-import 'firebase_options.dart';
 import 'providers/auth_provider.dart' as ap;
 import 'providers/listings_provider.dart';
 import 'services/auth_service.dart';
@@ -13,9 +12,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    await Firebase.initializeApp();
   } on FirebaseException catch (e) {
     if (e.code != 'duplicate-app') {
       rethrow;

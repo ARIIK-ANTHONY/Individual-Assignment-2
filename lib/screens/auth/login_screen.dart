@@ -26,14 +26,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
+    final navigator = Navigator.of(context);
     final auth = context.read<ap.AuthProvider>();
     final success = await auth.signIn(
         email: _emailCtrl.text.trim(), password: _passCtrl.text);
     if (!mounted) return;
     if (success) {
       await auth.reloadUser();
+      if (!mounted) return;
       if (!auth.isEmailVerified) {
-        Navigator.pushReplacement(context,
+        navigator.pushReplacement(
             MaterialPageRoute(builder: (_) => const EmailVerificationScreen()));
       }
     }
@@ -92,10 +94,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     margin: const EdgeInsets.only(bottom: 16),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppTheme.errorRed.withOpacity(0.1),
+                      color: AppTheme.errorRed.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border:
-                          Border.all(color: AppTheme.errorRed.withOpacity(0.3)),
+                      border: Border.all(
+                          color: AppTheme.errorRed.withValues(alpha: 0.3)),
                     ),
                     child: Row(children: [
                       const Icon(Icons.error_outline,
@@ -208,22 +210,19 @@ class _LoginScreenState extends State<LoginScreen> {
           ElevatedButton(
             onPressed: () async {
               if (ctrl.text.isNotEmpty) {
+                final authService = context.read<ap.AuthProvider>().authService;
+                final messenger = ScaffoldMessenger.of(context);
+                final dialogNavigator = Navigator.of(ctx);
                 try {
-                  await context
-                      .read<ap.AuthProvider>()
-                      .authService
-                      .sendPasswordResetEmail(ctrl.text.trim());
-                  if (mounted) {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Reset email sent!')));
-                  }
+                  await authService.sendPasswordResetEmail(ctrl.text.trim());
+                  if (!mounted) return;
+                  dialogNavigator.pop();
+                  messenger.showSnackBar(
+                      const SnackBar(content: Text('Reset email sent!')));
                 } catch (e) {
-                  if (mounted) {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(SnackBar(content: Text('Error: $e')));
-                  }
+                  if (!mounted) return;
+                  dialogNavigator.pop();
+                  messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
                 }
               }
             },

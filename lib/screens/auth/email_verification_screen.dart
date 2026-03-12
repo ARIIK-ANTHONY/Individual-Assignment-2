@@ -97,7 +97,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
               width: 88,
               height: 88,
               decoration: BoxDecoration(
-                  color: AppTheme.accentGold.withOpacity(0.15),
+                  color: AppTheme.accentGold.withValues(alpha: 0.15),
                   shape: BoxShape.circle),
               child: const Icon(Icons.mark_email_unread_outlined,
                   color: AppTheme.accentGold, size: 44),
