@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../models/listing_model.dart';
@@ -22,6 +23,57 @@ class _MapViewScreenState extends State<MapViewScreen> {
     target: LatLng(-1.9403, 29.8739),
     zoom: 7.2,
   );
+
+  bool _isInRwandaBounds(ListingModel l) {
+    return l.latitude >= -2.9 &&
+        l.latitude <= -1.0 &&
+        l.longitude >= 28.8 &&
+        l.longitude <= 30.95;
+  }
+
+  bool _hasValidCoordinates(ListingModel l) {
+    return l.latitude >= -90 &&
+        l.latitude <= 90 &&
+        l.longitude >= -180 &&
+        l.longitude <= 180;
+  }
+
+  List<ListingModel> _mapListings(List<ListingModel> listings) {
+    return listings.where(_hasValidCoordinates).toList();
+  }
+
+  List<ListingModel> _focusListings(List<ListingModel> listings) {
+    final rwanda = listings.where(_isInRwandaBounds).toList();
+    return rwanda.isNotEmpty ? rwanda : listings;
+  }
+
+  Future<void> _recenterToUser() async {
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      final granted = permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always;
+
+      if (!granted) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Location permission is required to center map.')));
+        return;
+      }
+
+      final pos = await Geolocator.getCurrentPosition();
+      await _mapCtrl?.animateCamera(CameraUpdate.newCameraPosition(
+          CameraPosition(
+              target: LatLng(pos.latitude, pos.longitude), zoom: 14)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Unable to access current location right now.')));
+    }
+  }
 
   Future<void> _fitToListings(List<ListingModel> listings) async {
     final ctrl = _mapCtrl;
@@ -79,16 +131,16 @@ class _MapViewScreenState extends State<MapViewScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.my_location_outlined),
-            onPressed: () => _mapCtrl
-                ?.animateCamera(CameraUpdate.newCameraPosition(_initial)),
+            onPressed: _recenterToUser,
           ),
         ],
       ),
       body: Consumer<ListingsProvider>(
         builder: (_, provider, __) {
-          final listings = provider.allListings;
+          final listings = _mapListings(provider.allListings);
+          final focusListings = _focusListings(listings);
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            _fitToListings(listings);
+            _fitToListings(focusListings);
           });
 
           return Stack(children: [
@@ -97,7 +149,7 @@ class _MapViewScreenState extends State<MapViewScreen> {
               markers: _markers(listings),
               onMapCreated: (c) {
                 _mapCtrl = c;
-                _fitToListings(listings);
+                _fitToListings(focusListings);
               },
               myLocationEnabled: false,
               myLocationButtonEnabled: false,
@@ -114,7 +166,7 @@ class _MapViewScreenState extends State<MapViewScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: AppTheme.cardDark.withOpacity(0.9),
+                  color: AppTheme.cardDark.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -149,12 +201,12 @@ class _MapViewScreenState extends State<MapViewScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
+                            color: Colors.black.withValues(alpha: 0.3),
                             blurRadius: 12,
                             offset: const Offset(0, 4))
                       ],
                       border: Border.all(
-                          color: AppTheme.accentGold.withOpacity(0.3)),
+                          color: AppTheme.accentGold.withValues(alpha: 0.3)),
                     ),
                     child: Row(children: [
                       Container(
@@ -242,7 +294,8 @@ class _ZoomBtn extends StatelessWidget {
                 color: AppTheme.cardDark,
                 borderRadius: BorderRadius.circular(8),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 6)
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3), blurRadius: 6)
                 ]),
             child: Icon(icon, color: AppTheme.textPrimary, size: 20)),
       );

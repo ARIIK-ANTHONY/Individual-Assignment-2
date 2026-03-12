@@ -55,8 +55,8 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
 
     // Prefer native map intents on Android to avoid webview interception.
     if (defaultTargetPlatform == TargetPlatform.android) {
-      final navUri = Uri.parse(
-          'google.navigation:q=${l.latitude},${l.longitude}&mode=d');
+      final navUri =
+          Uri.parse('google.navigation:q=${l.latitude},${l.longitude}&mode=d');
       if (await _tryLaunchExternal(navUri)) {
         return;
       }
@@ -69,8 +69,11 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
       }
     }
 
-    final webUri = Uri.parse('https://www.google.com/maps/dir/?api=1'
-        '&destination=${l.latitude},${l.longitude}&travelmode=driving');
+    final webUri = Uri.https('www.google.com', '/maps/dir/', {
+      'api': '1',
+      'destination': '${l.latitude},${l.longitude}',
+      'travelmode': 'driving',
+    });
     if (await _tryLaunchExternal(webUri)) {
       return;
     }
@@ -180,7 +183,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                          color: AppTheme.accentGold.withOpacity(0.15),
+                          color: AppTheme.accentGold.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6)),
                       child: Text(l.category,
                           style: const TextStyle(
@@ -247,7 +250,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                   const SizedBox(height: 16),
 
                   // Reviews
-                  _ReviewsSection(),
+                  const _ReviewsSection(),
                   const SizedBox(height: 24),
                   _AddReviewSection(
                     userRating: _userRating,
@@ -367,7 +370,7 @@ class _ReviewCard extends StatelessWidget {
           Row(children: [
             CircleAvatar(
               radius: 16,
-              backgroundColor: AppTheme.accentGold.withOpacity(0.2),
+              backgroundColor: AppTheme.accentGold.withValues(alpha: 0.2),
               child: Text(
                   review.userName.isNotEmpty
                       ? review.userName[0].toUpperCase()
