@@ -124,6 +124,13 @@ flutter run -d emulator-5554
 - Show Firebase Console changes live
 - Show key provider/service files while explaining logic
 
+## Assignment Docs
+
+- Rubric evidence map: `docs/rubric_evidence_checklist.md`
+- Demo run script: `docs/demo_video_runbook.md`
+- Submission quality checklist: `docs/submission_bundle_checklist.md`
+- Repository walkthrough notes: `docs/repository_walkthrough_notes.md`
+
 ## Notes
 
 - App is intended for Android emulator/physical device execution.
