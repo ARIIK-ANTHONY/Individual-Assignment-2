@@ -103,6 +103,13 @@ class ListingsProvider extends ChangeNotifier {
 
   void updateCategory(String c) {
     _selectedCategory = c;
+    _searchQuery = ''; // clear search so category results are never stale
+    notifyListeners();
+  }
+
+  void clearFilters() {
+    _selectedCategory = 'All';
+    _searchQuery = '';
     notifyListeners();
   }
 

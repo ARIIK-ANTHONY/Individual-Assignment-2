@@ -72,13 +72,32 @@ class _CategoryChips extends StatelessWidget {
   }
 }
 
-class _SearchBar extends StatelessWidget {
+class _SearchBar extends StatefulWidget {
   const _SearchBar();
   @override
+  State<_SearchBar> createState() => _SearchBarState();
+}
+
+class _SearchBarState extends State<_SearchBar> {
+  final _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Keep the text field in sync when category switch clears the query.
+    final query = context.watch<ListingsProvider>().searchQuery;
+    if (_ctrl.text != query) {
+      _ctrl.value = _ctrl.value.copyWith(text: query);
+    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
       child: TextField(
+        controller: _ctrl,
         style: const TextStyle(color: AppTheme.textPrimary),
         onChanged: context.read<ListingsProvider>().updateSearch,
         decoration: const InputDecoration(
