@@ -28,6 +28,11 @@ class MyListingsScreen extends StatelessWidget {
       ),
       body: Consumer2<ap.AuthProvider, ListingsProvider>(
         builder: (_, auth, listings, __) {
+          // Show a spinner while the initial Firestore load is still in flight.
+          if (listings.status == ListingsStatus.loading) {
+            return const Center(
+                child: CircularProgressIndicator(color: AppTheme.accentGold));
+          }
           final items = listings.userListings;
           if (items.isEmpty) {
             return Center(
