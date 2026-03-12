@@ -209,6 +209,16 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                   Text(l.description,
                       style: const TextStyle(
                           color: AppTheme.textSecondary, height: 1.6)),
+                  const SizedBox(height: 12),
+                  if (l.createdByName.isNotEmpty)
+                    Row(children: [
+                      const Icon(Icons.person_outline,
+                          color: AppTheme.textSecondary, size: 14),
+                      const SizedBox(width: 6),
+                      Text('Added by ${l.createdByName}',
+                          style: const TextStyle(
+                              color: AppTheme.textSecondary, fontSize: 12)),
+                    ]),
                   const SizedBox(height: 20),
 
                   _InfoRow(icon: Icons.location_on_outlined, text: l.address),
