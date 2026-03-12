@@ -39,7 +39,7 @@ class _CategoryChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ListingsProvider>();
-    final categories = AppConstants.categories;
+    const categories = AppConstants.categories;
     return SizedBox(
       height: 52,
       child: ListView.separated(
@@ -120,7 +120,7 @@ class _ListingsView extends StatelessWidget {
       return Center(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
         Icon(Icons.search_off,
-            color: AppTheme.textSecondary.withOpacity(0.5), size: 64),
+            color: AppTheme.textSecondary.withValues(alpha: 0.5), size: 64),
         const SizedBox(height: 16),
         const Text('No listings found',
             style: TextStyle(color: AppTheme.textPrimary, fontSize: 16)),
@@ -225,7 +225,7 @@ class _ListingCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                      color: AppTheme.accentGold.withOpacity(0.15),
+                      color: AppTheme.accentGold.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(4)),
                   child: Text(listing.category,
                       style: const TextStyle(

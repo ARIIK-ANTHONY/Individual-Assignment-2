@@ -25,6 +25,11 @@ class _AddEditListingScreenState extends State<AddEditListingScreen> {
   bool _isSaving = false;
   bool _isLocating = false;
 
+  static const _minRwandaLat = -2.9;
+  static const _maxRwandaLat = -1.0;
+  static const _minRwandaLng = 28.8;
+  static const _maxRwandaLng = 30.95;
+
   bool get isEditing => widget.listing != null;
 
   @override
@@ -40,6 +45,20 @@ class _AddEditListingScreenState extends State<AddEditListingScreen> {
     _lngCtrl = TextEditingController(
         text: l?.longitude.toString() ?? AppConstants.kigaliLng.toString());
     _selectedCategory = l?.category ?? AppConstants.categories[1];
+
+    // New listings default to current device coordinates for map accuracy.
+    if (!isEditing) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _getLocation();
+      });
+    }
+  }
+
+  bool _isInRwanda(double lat, double lng) {
+    return lat >= _minRwandaLat &&
+        lat <= _maxRwandaLat &&
+        lng >= _minRwandaLng &&
+        lng <= _maxRwandaLng;
   }
 
   @override
@@ -51,7 +70,9 @@ class _AddEditListingScreenState extends State<AddEditListingScreen> {
       _descCtrl,
       _latCtrl,
       _lngCtrl
-    ]) c.dispose();
+    ]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -63,8 +84,9 @@ class _AddEditListingScreenState extends State<AddEditListingScreen> {
       var perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) {
         perm = await Geolocator.requestPermission();
-        if (perm == LocationPermission.denied)
+        if (perm == LocationPermission.denied) {
           throw Exception('Permission denied');
+        }
       }
       final pos = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
@@ -73,9 +95,10 @@ class _AddEditListingScreenState extends State<AddEditListingScreen> {
         _lngCtrl.text = pos.longitude.toStringAsFixed(6);
       });
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Location error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isLocating = false);
     }
@@ -83,6 +106,21 @@ class _AddEditListingScreenState extends State<AddEditListingScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final parsedLat = double.tryParse(_latCtrl.text);
+    final parsedLng = double.tryParse(_lngCtrl.text);
+    if (parsedLat == null || parsedLng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Please provide valid latitude and longitude.')));
+      return;
+    }
+    if (!_isInRwanda(parsedLat, parsedLng)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Coordinates must be in Rwanda. Tap "Use Current" to autofill.')));
+      return;
+    }
+
     setState(() => _isSaving = true);
     final auth = context.read<ap.AuthProvider>();
     final provider = context.read<ListingsProvider>();
@@ -93,8 +131,8 @@ class _AddEditListingScreenState extends State<AddEditListingScreen> {
       address: _addressCtrl.text.trim(),
       contactNumber: _contactCtrl.text.trim(),
       description: _descCtrl.text.trim(),
-      latitude: double.tryParse(_latCtrl.text) ?? AppConstants.kigaliLat,
-      longitude: double.tryParse(_lngCtrl.text) ?? AppConstants.kigaliLng,
+      latitude: parsedLat,
+      longitude: parsedLng,
       createdBy: auth.user!.uid,
       createdByName: auth.userProfile?.displayName ?? '',
       createdAt: widget.listing?.createdAt ?? DateTime.now(),
@@ -250,7 +288,11 @@ class _AddEditListingScreenState extends State<AddEditListingScreen> {
                       decoration: const InputDecoration(hintText: 'Latitude'),
                       validator: (v) {
                         if (v == null || v.isEmpty) return 'Required';
-                        if (double.tryParse(v) == null) return 'Invalid';
+                        final lat = double.tryParse(v);
+                        if (lat == null) return 'Invalid';
+                        if (lat < _minRwandaLat || lat > _maxRwandaLat) {
+                          return 'Use Rwanda latitude';
+                        }
                         return null;
                       })),
               const SizedBox(width: 12),
@@ -263,7 +305,11 @@ class _AddEditListingScreenState extends State<AddEditListingScreen> {
                       decoration: const InputDecoration(hintText: 'Longitude'),
                       validator: (v) {
                         if (v == null || v.isEmpty) return 'Required';
-                        if (double.tryParse(v) == null) return 'Invalid';
+                        final lng = double.tryParse(v);
+                        if (lng == null) return 'Invalid';
+                        if (lng < _minRwandaLng || lng > _maxRwandaLng) {
+                          return 'Use Rwanda longitude';
+                        }
                         return null;
                       })),
             ]),

@@ -33,7 +33,8 @@ class MyListingsScreen extends StatelessWidget {
             return Center(
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
               Icon(Icons.add_location_alt_outlined,
-                  size: 72, color: AppTheme.textSecondary.withOpacity(0.4)),
+                  size: 72,
+                  color: AppTheme.textSecondary.withValues(alpha: 0.4)),
               const SizedBox(height: 16),
               const Text('No listings yet',
                   style: TextStyle(
@@ -89,10 +90,11 @@ class MyListingsScreen extends StatelessWidget {
             onPressed: () async {
               Navigator.pop(ctx);
               await provider.deleteListing(listing.id);
-              if (context.mounted)
+              if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                     content: Text('Listing deleted'),
                     backgroundColor: AppTheme.errorRed));
+              }
             },
             style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.errorRed,
@@ -151,7 +153,7 @@ class _MyListingCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                   decoration: BoxDecoration(
-                      color: AppTheme.accentGold.withOpacity(0.15),
+                      color: AppTheme.accentGold.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(4)),
                   child: Text(listing.category,
                       style: const TextStyle(

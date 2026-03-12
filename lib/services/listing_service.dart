@@ -33,7 +33,9 @@ class ListingService {
   Future<void> deleteListing(String id) async {
     await _listings.doc(id).delete();
     final reviews = await _reviews.where('listingId', isEqualTo: id).get();
-    for (final d in reviews.docs) await d.reference.delete();
+    for (final d in reviews.docs) {
+      await d.reference.delete();
+    }
   }
 
   Stream<List<ReviewModel>> getReviewsStream(String listingId) => _reviews

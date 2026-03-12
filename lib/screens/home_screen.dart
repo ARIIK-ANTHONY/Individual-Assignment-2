@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart' as ap;
@@ -16,18 +18,15 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  final List<Widget?> _screens = List<Widget?>.filled(4, null);
 
-  Widget _screenForIndex(int index) {
-    switch (index) {
-      case 0:
-        return const DirectoryScreen();
-      case 1:
-        return const MyListingsScreen();
-      case 2:
-        return const MapViewScreen();
-      default:
-        return const SettingsScreen();
-    }
+  Widget _screenAt(int index) {
+    return _screens[index] ??= switch (index) {
+      0 => const DirectoryScreen(),
+      1 => const MyListingsScreen(),
+      2 => const MapViewScreen(),
+      _ => const SettingsScreen(),
+    };
   }
 
   @override
@@ -38,26 +37,38 @@ class _HomeScreenState extends State<HomeScreen> {
       final listings = context.read<ListingsProvider>();
 
       final user = auth.user;
+      listings.subscribeToAllListings();
+      if (user != null) {
+        listings.subscribeToUserListings(user.uid);
+      }
+
       if (user != null) {
         final createdByName = auth.userProfile?.displayName ??
             user.displayName ??
             user.email?.split('@').first ??
             'Community User';
-        await listings.ensureStarterListings(
+        unawaited(listings.ensureStarterListings(
           createdByUid: user.uid,
           createdByName: createdByName,
-        );
+        ));
       }
-
-      listings.subscribeToAllListings();
-      if (user != null) listings.subscribeToUserListings(user.uid);
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    for (var i = 0; i <= _currentIndex; i++) {
+      _screenAt(i);
+    }
+
     return Scaffold(
-      body: _screenForIndex(_currentIndex),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: List<Widget>.generate(
+          _screens.length,
+          (i) => _screens[i] ?? const SizedBox.shrink(),
+        ),
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (i) => setState(() => _currentIndex = i),
