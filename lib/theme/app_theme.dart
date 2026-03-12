@@ -19,7 +19,6 @@ class AppTheme {
       colorScheme: const ColorScheme.dark(
         primary: accentGold,
         surface: cardDark,
-        background: primaryDark,
         error: errorRed,
       ),
       appBarTheme: const AppBarTheme(
