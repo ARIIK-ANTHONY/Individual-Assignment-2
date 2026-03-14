@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart' as ap;
 import '../../theme/app_theme.dart';
-import 'email_verification_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -40,8 +39,8 @@ class _SignupScreenState extends State<SignupScreen> {
     );
     if (!mounted) return;
     if (success) {
-      Navigator.pushReplacement(context,
-          MaterialPageRoute(builder: (_) => const EmailVerificationScreen()));
+      // Return to the root route so AuthWrapper can decide Home vs Verify screen.
+      Navigator.of(context).popUntil((route) => route.isFirst);
       return;
     }
 

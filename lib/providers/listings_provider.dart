@@ -20,6 +20,18 @@ class ListingsProvider extends ChangeNotifier {
   StreamSubscription<List<ListingModel>>? _allSub;
   StreamSubscription<List<ListingModel>>? _userSub;
   StreamSubscription<List<ReviewModel>>? _reviewsSub;
+  Timer? _searchDebounce;
+  DateTime? _lastTransientErrorAt;
+
+  bool _canEmitTransientError() {
+    final now = DateTime.now();
+    if (_lastTransientErrorAt == null ||
+        now.difference(_lastTransientErrorAt!) > const Duration(seconds: 10)) {
+      _lastTransientErrorAt = now;
+      return true;
+    }
+    return false;
+  }
 
   ListingsProvider(this._service);
 
@@ -65,18 +77,29 @@ class ListingsProvider extends ChangeNotifier {
     _allSub = _service.getListingsStream().listen(
       (list) {
         _allListings = list;
+        _errorMessage = null;
         _status = ListingsStatus.loaded;
         notifyListeners();
       },
       onError: (e) {
         final msg = e.toString().toLowerCase();
-        if (msg.contains('unavailable') || msg.contains('unable to resolve host')) {
+        final isTransient = msg.contains('unavailable') ||
+            msg.contains('unable to resolve host');
+
+        if (isTransient && !_canEmitTransientError()) {
+          return;
+        }
+
+        if (msg.contains('unavailable') ||
+            msg.contains('unable to resolve host')) {
           _errorMessage =
               'Network unavailable. Check emulator internet and try again.';
         } else {
           _errorMessage = 'Failed to load listings: $e';
         }
-        _status = ListingsStatus.error;
+        _status = _allListings.isNotEmpty
+            ? ListingsStatus.loaded
+            : ListingsStatus.error;
         notifyListeners();
       },
     );
@@ -90,6 +113,12 @@ class ListingsProvider extends ChangeNotifier {
         notifyListeners();
       },
       onError: (e) {
+        final msg = e.toString().toLowerCase();
+        if ((msg.contains('unavailable') ||
+                msg.contains('unable to resolve host')) &&
+            !_canEmitTransientError()) {
+          return;
+        }
         _errorMessage = 'Failed to load your listings: $e';
         notifyListeners();
       },
@@ -97,8 +126,12 @@ class ListingsProvider extends ChangeNotifier {
   }
 
   void updateSearch(String q) {
-    _searchQuery = q;
-    notifyListeners();
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 180), () {
+      if (_searchQuery == q) return;
+      _searchQuery = q;
+      notifyListeners();
+    });
   }
 
   void updateCategory(String c) {
@@ -108,14 +141,34 @@ class ListingsProvider extends ChangeNotifier {
   }
 
   void clearFilters() {
+    _searchDebounce?.cancel();
     _selectedCategory = 'All';
     _searchQuery = '';
     notifyListeners();
   }
 
+  void _upsertLocalListing(ListingModel listing) {
+    final allIdx = _allListings.indexWhere((x) => x.id == listing.id);
+    if (allIdx == -1) {
+      _allListings.insert(0, listing);
+    } else {
+      _allListings[allIdx] = listing;
+    }
+
+    final userIdx = _userListings.indexWhere((x) => x.id == listing.id);
+    if (userIdx == -1) {
+      _userListings.insert(0, listing);
+    } else {
+      _userListings[userIdx] = listing;
+    }
+  }
+
   Future<bool> createListing(ListingModel l) async {
     try {
-      await _service.createListing(l);
+      final id = await _service.createListing(l);
+      _upsertLocalListing(l.copyWith(id: id));
+      _errorMessage = null;
+      notifyListeners();
       return true;
     } catch (e) {
       _errorMessage = 'Failed to create: $e';
@@ -142,6 +195,9 @@ class ListingsProvider extends ChangeNotifier {
   Future<bool> updateListing(ListingModel l) async {
     try {
       await _service.updateListing(l);
+      _upsertLocalListing(l);
+      _errorMessage = null;
+      notifyListeners();
       return true;
     } catch (e) {
       _errorMessage = 'Failed to update: $e';
@@ -166,11 +222,20 @@ class ListingsProvider extends ChangeNotifier {
     _reviewsSub = _service.getReviewsStream(listingId).listen(
       (r) {
         _currentReviews = r;
+        _errorMessage = null;
         notifyListeners();
       },
       onError: (e) {
         final msg = e.toString().toLowerCase();
-        if (msg.contains('unavailable') || msg.contains('unable to resolve host')) {
+        final isTransient = msg.contains('unavailable') ||
+            msg.contains('unable to resolve host');
+
+        if (isTransient && !_canEmitTransientError()) {
+          return;
+        }
+
+        if (msg.contains('unavailable') ||
+            msg.contains('unable to resolve host')) {
           _errorMessage =
               'Reviews are unavailable while offline. Reconnect and retry.';
         } else {
@@ -199,6 +264,7 @@ class ListingsProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _allSub?.cancel();
     _userSub?.cancel();
     _reviewsSub?.cancel();

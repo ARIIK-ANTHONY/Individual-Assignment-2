@@ -1,9 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 import '../models/listing_model.dart';
 import '../models/review_model.dart';
 
 class ListingService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  ListingService() {
+    // Keep cached data available when emulator DNS/network is unstable.
+    _db.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
+  }
 
   CollectionReference get _listings => _db.collection('listings');
   CollectionReference get _reviews => _db.collection('reviews');
@@ -13,26 +22,42 @@ class ListingService {
       .snapshots()
       .map((s) => s.docs.map(ListingModel.fromFirestore).toList());
 
-  Stream<List<ListingModel>> getUserListingsStream(String uid) => _listings
-      .where('createdBy', isEqualTo: uid)
-      .snapshots()
-      .map((s) {
+  Stream<List<ListingModel>> getUserListingsStream(String uid) =>
+      _listings.where('createdBy', isEqualTo: uid).snapshots().map((s) {
         final items = s.docs.map(ListingModel.fromFirestore).toList();
         items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         return items;
       });
 
   Future<String> createListing(ListingModel l) async {
-    final ref = await _listings.add(l.toFirestore());
+    final ref = _listings.doc();
+    await ref.set(l.copyWith(id: ref.id).toFirestore()).timeout(
+          const Duration(seconds: 8),
+          onTimeout: () =>
+              throw TimeoutException('Create listing timed out. Try again.'),
+        );
     return ref.id;
   }
 
   Future<void> updateListing(ListingModel l) =>
-      _listings.doc(l.id).update(l.toFirestore());
+      _listings.doc(l.id).update(l.toFirestore()).timeout(
+            const Duration(seconds: 8),
+            onTimeout: () =>
+                throw TimeoutException('Update listing timed out.'),
+          );
 
   Future<void> deleteListing(String id) async {
-    await _listings.doc(id).delete();
-    final reviews = await _reviews.where('listingId', isEqualTo: id).get();
+    await _listings.doc(id).delete().timeout(
+          const Duration(seconds: 8),
+          onTimeout: () => throw TimeoutException('Delete listing timed out.'),
+        );
+    final reviews = await _reviews
+        .where('listingId', isEqualTo: id)
+        .get()
+        .timeout(
+          const Duration(seconds: 8),
+          onTimeout: () => throw TimeoutException('Delete cleanup timed out.'),
+        );
     for (final d in reviews.docs) {
       await d.reference.delete();
     }
@@ -64,14 +89,13 @@ class ListingService {
     required String createdByUid,
     required String createdByName,
   }) async {
-    final existing = await _listings.get();
-    final existingKeys = <String>{};
-    for (final doc in existing.docs) {
-      final data = doc.data() as Map<String, dynamic>;
-      final name = (data['name'] ?? '').toString().trim().toLowerCase();
-      final category = (data['category'] ?? '').toString().trim().toLowerCase();
-      existingKeys.add('$category|$name');
-    }
+    // Fast path: if any listing exists, skip seeding to keep startup responsive.
+    final existing = await _listings.limit(1).get().timeout(
+          const Duration(seconds: 8),
+          onTimeout: () =>
+              throw TimeoutException('Starter seed check timed out'),
+        );
+    if (existing.docs.isNotEmpty) return;
 
     final now = DateTime.now();
     final starterListings = <Map<String, dynamic>>[
@@ -133,7 +157,8 @@ class ListingService {
         category: 'Restaurant',
         address: 'KN 29 St, Kiyovu, Kigali',
         contactNumber: '+250 788 555 666',
-        description: 'Well-known restaurant serving local and international cuisine.',
+        description:
+            'Well-known restaurant serving local and international cuisine.',
         latitude: -1.9490,
         longitude: 30.0588,
         createdBy: createdByUid,
@@ -156,18 +181,10 @@ class ListingService {
     ];
 
     final batch = _db.batch();
-    var addedCount = 0;
     for (final data in starterListings) {
-      final name = (data['name'] ?? '').toString().trim().toLowerCase();
-      final category = (data['category'] ?? '').toString().trim().toLowerCase();
-      final key = '$category|$name';
-      if (existingKeys.contains(key)) continue;
       final ref = _listings.doc();
       batch.set(ref, data);
-      addedCount++;
     }
-    if (addedCount > 0) {
-      await batch.commit();
-    }
+    await batch.commit();
   }
 }

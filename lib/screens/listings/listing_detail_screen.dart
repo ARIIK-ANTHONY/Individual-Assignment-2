@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/listing_model.dart';
@@ -20,9 +19,14 @@ class ListingDetailScreen extends StatefulWidget {
 }
 
 class _ListingDetailScreenState extends State<ListingDetailScreen> {
-  GoogleMapController? _mapCtrl;
   double _userRating = 0;
   final _reviewCtrl = TextEditingController();
+
+  bool _hasDefaultKigaliCoordinates(ListingModel l) {
+    const epsilon = 0.0002;
+    return (l.latitude - AppConstants.kigaliLat).abs() < epsilon &&
+        (l.longitude - AppConstants.kigaliLng).abs() < epsilon;
+  }
 
   @override
   void initState() {
@@ -34,7 +38,6 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   @override
   void dispose() {
     _reviewCtrl.dispose();
-    _mapCtrl?.dispose();
     super.dispose();
   }
 
@@ -52,18 +55,22 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
 
   Future<void> _launchNavigation() async {
     final l = widget.listing;
+    final useAddressQuery = _hasDefaultKigaliCoordinates(l);
+    final addressQuery = '${l.name}, ${l.address}, Rwanda';
+    final destination =
+        useAddressQuery ? addressQuery : '${l.latitude},${l.longitude}';
 
     // Prefer native map intents on Android to avoid webview interception.
     if (defaultTargetPlatform == TargetPlatform.android) {
-      final navUri =
-          Uri.parse('google.navigation:q=${l.latitude},${l.longitude}&mode=d');
+      final navUri = Uri.parse(
+          'google.navigation:q=${Uri.encodeComponent(destination)}&mode=d');
       if (await _tryLaunchExternal(navUri)) {
         return;
       }
 
-      final label = Uri.encodeComponent(l.name);
-      final geoUri = Uri.parse(
-          'geo:${l.latitude},${l.longitude}?q=${l.latitude},${l.longitude}($label)');
+      final geoUri = useAddressQuery
+          ? Uri.parse('geo:0,0?q=${Uri.encodeComponent(addressQuery)}')
+          : Uri.parse('geo:${l.latitude},${l.longitude}?q=$destination');
       if (await _tryLaunchExternal(geoUri)) {
         return;
       }
@@ -71,7 +78,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
 
     final webUri = Uri.https('www.google.com', '/maps/dir/', {
       'api': '1',
-      'destination': '${l.latitude},${l.longitude}',
+      'destination': destination,
       'travelmode': 'driving',
     });
     if (await _tryLaunchExternal(webUri)) {
@@ -137,30 +144,73 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
             expandedHeight: 260,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
-              background: GoogleMap(
-                initialCameraPosition: CameraPosition(
-                    target: LatLng(l.latitude, l.longitude), zoom: 15),
-                markers: {
-                  Marker(
-                    markerId: MarkerId(l.id),
-                    position: LatLng(l.latitude, l.longitude),
-                    infoWindow: InfoWindow(title: l.name),
-                  )
-                },
-                onMapCreated: (c) => _mapCtrl = c,
-                zoomControlsEnabled: false,
-                myLocationEnabled: false,
-                myLocationButtonEnabled: false,
+              background: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF1A2D3D), Color(0xFF0E1822)],
+                  ),
+                ),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.place,
+                            color: AppTheme.accentGold, size: 52),
+                        const SizedBox(height: 10),
+                        Text(
+                          l.name,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          l.address,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
             actions: [
               if (isOwner) ...[
                 IconButton(
                   icon: const Icon(Icons.edit_outlined),
-                  onPressed: () => Navigator.push(
+                  onPressed: () {
+                    final auth = context.read<ap.AuthProvider>();
+                    final listings = context.read<ListingsProvider>();
+                    Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => AddEditListingScreen(listing: l))),
+                        builder: (_) => MultiProvider(
+                          providers: [
+                            ChangeNotifierProvider<ap.AuthProvider>.value(
+                                value: auth),
+                            ChangeNotifierProvider<ListingsProvider>.value(
+                                value: listings),
+                          ],
+                          child: AddEditListingScreen(listing: l),
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete_outline,

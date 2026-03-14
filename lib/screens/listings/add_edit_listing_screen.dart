@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
@@ -24,6 +25,8 @@ class _AddEditListingScreenState extends State<AddEditListingScreen> {
   late String _selectedCategory;
   bool _isSaving = false;
   bool _isLocating = false;
+  static const Duration _locationTimeout = Duration(seconds: 8);
+  static const Duration _saveTimeout = Duration(seconds: 10);
 
   static const _minRwandaLat = -2.9;
   static const _maxRwandaLat = -1.0;
@@ -45,13 +48,6 @@ class _AddEditListingScreenState extends State<AddEditListingScreen> {
     _lngCtrl = TextEditingController(
         text: l?.longitude.toString() ?? AppConstants.kigaliLng.toString());
     _selectedCategory = l?.category ?? AppConstants.categories[1];
-
-    // New listings default to current device coordinates for map accuracy.
-    if (!isEditing) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _getLocation();
-      });
-    }
   }
 
   bool _isInRwanda(double lat, double lng) {
@@ -77,7 +73,10 @@ class _AddEditListingScreenState extends State<AddEditListingScreen> {
   }
 
   Future<void> _getLocation() async {
+    if (_isLocating) return;
     setState(() => _isLocating = true);
+    final sw = Stopwatch()..start();
+    debugPrint('Location fetch started');
     try {
       bool svc = await Geolocator.isLocationServiceEnabled();
       if (!svc) throw Exception('Location services disabled');
@@ -89,17 +88,53 @@ class _AddEditListingScreenState extends State<AddEditListingScreen> {
         }
       }
       final pos = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
-      setState(() {
-        _latCtrl.text = pos.latitude.toStringAsFixed(6);
-        _lngCtrl.text = pos.longitude.toStringAsFixed(6);
-      });
+        desiredAccuracy: LocationAccuracy.high,
+      ).timeout(
+        _locationTimeout,
+        onTimeout: () {
+          throw TimeoutException(
+              'Timed out fetching GPS location. Try again or enter coordinates manually.');
+        },
+      );
+
+      if (!_isInRwanda(pos.latitude, pos.longitude)) {
+        if (mounted) {
+          // Emulator GPS defaults to a non-Rwanda location — fall back to Kigali centre.
+          setState(() {
+            _latCtrl.text = AppConstants.kigaliLat.toStringAsFixed(6);
+            _lngCtrl.text = AppConstants.kigaliLng.toStringAsFixed(6);
+          });
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text(
+                  'GPS is outside Rwanda — defaulted to Kigali city centre. Adjust the coordinates if needed.')));
+        }
+        return;
+      }
+
+      if (mounted) {
+        setState(() {
+          _latCtrl.text = pos.latitude.toStringAsFixed(6);
+          _lngCtrl.text = pos.longitude.toStringAsFixed(6);
+        });
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Location error: $e')));
+        if (e is TimeoutException) {
+          setState(() {
+            _latCtrl.text = AppConstants.kigaliLat.toStringAsFixed(6);
+            _lngCtrl.text = AppConstants.kigaliLng.toStringAsFixed(6);
+          });
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text(
+                  'GPS request timed out - using Kigali city centre coordinates.')));
+        } else {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text('Location error: $e')));
+        }
       }
     } finally {
+      sw.stop();
+      debugPrint('Location fetch finished in ${sw.elapsedMilliseconds}ms');
       if (mounted) setState(() => _isLocating = false);
     }
   }
@@ -107,23 +142,45 @@ class _AddEditListingScreenState extends State<AddEditListingScreen> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final parsedLat = double.tryParse(_latCtrl.text);
-    final parsedLng = double.tryParse(_lngCtrl.text);
+    var parsedLat = double.tryParse(_latCtrl.text);
+    var parsedLng = double.tryParse(_lngCtrl.text);
     if (parsedLat == null || parsedLng == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Please provide valid latitude and longitude.')));
       return;
     }
     if (!_isInRwanda(parsedLat, parsedLng)) {
+      parsedLat = AppConstants.kigaliLat;
+      parsedLng = AppConstants.kigaliLng;
+      _latCtrl.text = parsedLat.toStringAsFixed(6);
+      _lngCtrl.text = parsedLng.toStringAsFixed(6);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text(
-              'Coordinates must be in Rwanda. Tap "Use Current" to autofill.')));
+              'Coordinates were outside Rwanda and have been adjusted to Kigali city centre.')));
+    }
+
+    ap.AuthProvider auth;
+    ListingsProvider provider;
+    try {
+      auth = context.read<ap.AuthProvider>();
+      provider = context.read<ListingsProvider>();
+    } on ProviderNotFoundException catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'Session context is outdated. Please hot restart the app and try again.')));
+      }
+      return;
+    }
+
+    final currentUser = auth.user;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('You must be signed in to create a listing.')));
       return;
     }
 
     setState(() => _isSaving = true);
-    final auth = context.read<ap.AuthProvider>();
-    final provider = context.read<ListingsProvider>();
     final listing = ListingModel(
       id: widget.listing?.id ?? '',
       name: _nameCtrl.text.trim(),
@@ -133,15 +190,26 @@ class _AddEditListingScreenState extends State<AddEditListingScreen> {
       description: _descCtrl.text.trim(),
       latitude: parsedLat,
       longitude: parsedLng,
-      createdBy: auth.user!.uid,
+      createdBy: currentUser.uid,
       createdByName: auth.userProfile?.displayName ?? '',
       createdAt: widget.listing?.createdAt ?? DateTime.now(),
       rating: widget.listing?.rating ?? 0.0,
       reviewCount: widget.listing?.reviewCount ?? 0,
     );
-    final ok = isEditing
-        ? await provider.updateListing(listing)
-        : await provider.createListing(listing);
+    final ok = await (isEditing
+            ? provider.updateListing(listing)
+            : provider.createListing(listing))
+        .timeout(
+      _saveTimeout,
+      onTimeout: () {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text(
+                  'Save is taking too long. Please check internet and try again.')));
+        }
+        return false;
+      },
+    );
     if (!mounted) return;
     setState(() => _isSaving = false);
     if (ok) {
@@ -277,6 +345,11 @@ class _AddEditListingScreenState extends State<AddEditListingScreen> {
                 style: TextButton.styleFrom(padding: EdgeInsets.zero),
               ),
             ]),
+            const SizedBox(height: 6),
+            const Text(
+              'Tap "Use Current" to fetch your device location once. This avoids startup lag on slower emulators.',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+            ),
             const SizedBox(height: 8),
             Row(children: [
               Expanded(
@@ -290,8 +363,8 @@ class _AddEditListingScreenState extends State<AddEditListingScreen> {
                         if (v == null || v.isEmpty) return 'Required';
                         final lat = double.tryParse(v);
                         if (lat == null) return 'Invalid';
-                        if (lat < _minRwandaLat || lat > _maxRwandaLat) {
-                          return 'Use Rwanda latitude';
+                        if (lat < -90 || lat > 90) {
+                          return 'Latitude out of range';
                         }
                         return null;
                       })),
@@ -307,8 +380,8 @@ class _AddEditListingScreenState extends State<AddEditListingScreen> {
                         if (v == null || v.isEmpty) return 'Required';
                         final lng = double.tryParse(v);
                         if (lng == null) return 'Invalid';
-                        if (lng < _minRwandaLng || lng > _maxRwandaLng) {
-                          return 'Use Rwanda longitude';
+                        if (lng < -180 || lng > 180) {
+                          return 'Longitude out of range';
                         }
                         return null;
                       })),

@@ -19,6 +19,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   final List<Widget?> _screens = List<Widget?>.filled(4, null);
+  static bool _starterSeedTriggered = false;
 
   Widget _screenAt(int index) {
     return _screens[index] ??= switch (index) {
@@ -33,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
       final auth = context.read<ap.AuthProvider>();
       final listings = context.read<ListingsProvider>();
 
@@ -42,7 +44,8 @@ class _HomeScreenState extends State<HomeScreen> {
         listings.subscribeToUserListings(user.uid);
       }
 
-      if (user != null) {
+      if (user != null && !_starterSeedTriggered) {
+        _starterSeedTriggered = true;
         final createdByName = auth.userProfile?.displayName ??
             user.displayName ??
             user.email?.split('@').first ??

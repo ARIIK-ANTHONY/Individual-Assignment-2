@@ -2,25 +2,46 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Run Flutter Android Emulator",
+			"label": "Launch Play Emulator (API 33)",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"emulators",
+				"--launch",
+				"Pixel_6a_3"
+			],
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "Run Flutter Android",
 			"type": "shell",
 			"command": "flutter",
 			"args": [
 				"run",
 				"-d",
-				"emulator-5554"
+				"emulator-5556",
+				"--no-enable-impeller"
 			],
-			"isBackground": true
-		},
-		{
-			"label": "Run Flutter Android (cmd)",
-			"type": "shell",
-			"command": "cmd",
-			"args": [
-				"/c",
-				"flutter run -d emulator-5554"
-			],
-			"isBackground": true
+			"isBackground": true,
+			"dependsOn": "Launch Play Emulator (API 33)",
+			"problemMatcher": [
+				{
+					"pattern": [
+						{
+							"regexp": ".",
+							"file": 1,
+							"location": 2,
+							"message": 3
+						}
+					],
+					"background": {
+						"activeOnStart": true,
+						"beginsPattern": "Launching lib",
+						"endsPattern": "Flutter run key commands"
+					}
+				}
+			]
 		}
 	]
 }

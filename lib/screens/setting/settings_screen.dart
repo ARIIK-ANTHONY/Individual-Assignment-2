@@ -8,9 +8,14 @@ class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   String _initials(String name) {
-    final parts = name.trim().split(' ');
-    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    return name.isNotEmpty ? name[0].toUpperCase() : 'U';
+    final cleaned = name.trim();
+    if (cleaned.isEmpty) return 'U';
+
+    final parts = cleaned.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return parts.first[0].toUpperCase();
   }
 
   @override

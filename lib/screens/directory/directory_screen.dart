@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:provider/provider.dart';
 import '../../models/listing_model.dart';
+import '../../providers/auth_provider.dart' as ap;
 import '../../providers/listings_provider.dart';
 import '../../theme/app_theme.dart';
 import '../listings/listing_detail_screen.dart';
@@ -9,6 +10,23 @@ import '../listings/add_edit_listing_screen.dart';
 
 class DirectoryScreen extends StatelessWidget {
   const DirectoryScreen({super.key});
+
+  void _openAddListing(BuildContext context) {
+    final auth = context.read<ap.AuthProvider>();
+    final listings = context.read<ListingsProvider>();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MultiProvider(
+          providers: [
+            ChangeNotifierProvider<ap.AuthProvider>.value(value: auth),
+            ChangeNotifierProvider<ListingsProvider>.value(value: listings),
+          ],
+          child: const AddEditListingScreen(),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,10 +36,7 @@ class DirectoryScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.add_circle_outline),
-            onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const AddEditListingScreen())),
+            onPressed: () => _openAddListing(context),
           ),
         ],
       ),
@@ -182,10 +197,23 @@ class _ListingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final emoji = AppConstants.categoryIcons[listing.category] ?? '📍';
     return InkWell(
-      onTap: () => Navigator.push(
+      onTap: () {
+        final auth = context.read<ap.AuthProvider>();
+        final listings = context.read<ListingsProvider>();
+        Navigator.push(
           context,
           MaterialPageRoute(
-              builder: (_) => ListingDetailScreen(listing: listing))),
+            builder: (_) => MultiProvider(
+              providers: [
+                ChangeNotifierProvider<ap.AuthProvider>.value(value: auth),
+                ChangeNotifierProvider<ListingsProvider>.value(
+                    value: listings),
+              ],
+              child: ListingDetailScreen(listing: listing),
+            ),
+          ),
+        );
+      },
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(16),

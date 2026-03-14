@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart' as ap;
 import '../../theme/app_theme.dart';
 import 'signup_screen.dart';
-import 'email_verification_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -26,18 +25,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
-    final navigator = Navigator.of(context);
     final auth = context.read<ap.AuthProvider>();
     final success = await auth.signIn(
         email: _emailCtrl.text.trim(), password: _passCtrl.text);
     if (!mounted) return;
     if (success) {
       await auth.reloadUser();
-      if (!mounted) return;
-      if (!auth.isEmailVerified) {
-        navigator.pushReplacement(
-            MaterialPageRoute(builder: (_) => const EmailVerificationScreen()));
-      }
     }
   }
 
@@ -173,10 +166,18 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Text("Don't have an account? ",
                       style: TextStyle(color: AppTheme.textSecondary)),
                   TextButton(
-                    onPressed: () => Navigator.push(
+                    onPressed: () {
+                      final auth = context.read<ap.AuthProvider>();
+                      Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (_) => const SignupScreen())),
+                          builder: (_) => ChangeNotifierProvider<ap.AuthProvider>.value(
+                            value: auth,
+                            child: const SignupScreen(),
+                          ),
+                        ),
+                      );
+                    },
                     child: const Text('Sign Up'),
                   ),
                 ]),

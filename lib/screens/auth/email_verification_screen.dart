@@ -16,16 +16,32 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   Timer? _resendTimer;
   bool _canResend = true;
   int _resendCountdown = 0;
+  bool _isReloading = false;
+
+  static const Duration _pollInterval = Duration(seconds: 5);
+  static const Duration _reloadTimeout = Duration(seconds: 4);
 
   @override
   void initState() {
     super.initState();
-    // Poll Firebase every 3 seconds to detect verification
-    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
-      try {
-        await context.read<ap.AuthProvider>().reloadUser();
-      } catch (_) {}
-    });
+    // Poll verification without overlapping requests to avoid main-isolate churn.
+    _pollTimer = Timer.periodic(_pollInterval, (_) => _pollForVerification());
+    _pollForVerification();
+  }
+
+  Future<void> _pollForVerification() async {
+    if (!mounted || _isReloading) return;
+    _isReloading = true;
+    try {
+      await context
+          .read<ap.AuthProvider>()
+          .reloadUser()
+          .timeout(_reloadTimeout);
+    } catch (_) {
+      // Polling failures are non-fatal; next tick retries.
+    } finally {
+      _isReloading = false;
+    }
   }
 
   @override

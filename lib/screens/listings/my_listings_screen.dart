@@ -11,6 +11,40 @@ import 'listing_detail_screen.dart';
 class MyListingsScreen extends StatelessWidget {
   const MyListingsScreen({super.key});
 
+  void _openAddListing(BuildContext context) {
+    final auth = context.read<ap.AuthProvider>();
+    final listings = context.read<ListingsProvider>();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MultiProvider(
+          providers: [
+            ChangeNotifierProvider<ap.AuthProvider>.value(value: auth),
+            ChangeNotifierProvider<ListingsProvider>.value(value: listings),
+          ],
+          child: const AddEditListingScreen(),
+        ),
+      ),
+    );
+  }
+
+  void _openEditListing(BuildContext context, ListingModel listing) {
+    final auth = context.read<ap.AuthProvider>();
+    final listings = context.read<ListingsProvider>();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MultiProvider(
+          providers: [
+            ChangeNotifierProvider<ap.AuthProvider>.value(value: auth),
+            ChangeNotifierProvider<ListingsProvider>.value(value: listings),
+          ],
+          child: AddEditListingScreen(listing: listing),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -19,10 +53,7 @@ class MyListingsScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const AddEditListingScreen())),
+            onPressed: () => _openAddListing(context),
           ),
         ],
       ),
@@ -51,10 +82,7 @@ class MyListingsScreen extends StatelessWidget {
                   style: TextStyle(color: AppTheme.textSecondary)),
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const AddEditListingScreen())),
+                onPressed: () => _openAddListing(context),
                 icon: const Icon(Icons.add),
                 label: const Text('Add Listing'),
                 style:
@@ -68,10 +96,7 @@ class MyListingsScreen extends StatelessWidget {
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (_, i) => _MyListingCard(
               listing: items[i],
-              onEdit: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => AddEditListingScreen(listing: items[i]))),
+              onEdit: () => _openEditListing(context, items[i]),
               onDelete: () => _confirmDelete(context, listings, items[i]),
             ),
           );
@@ -122,10 +147,23 @@ class _MyListingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final emoji = AppConstants.categoryIcons[listing.category] ?? '📍';
     return InkWell(
-      onTap: () => Navigator.push(
+      onTap: () {
+        final auth = context.read<ap.AuthProvider>();
+        final listings = context.read<ListingsProvider>();
+        Navigator.push(
           context,
           MaterialPageRoute(
-              builder: (_) => ListingDetailScreen(listing: listing))),
+            builder: (_) => MultiProvider(
+              providers: [
+                ChangeNotifierProvider<ap.AuthProvider>.value(value: auth),
+                ChangeNotifierProvider<ListingsProvider>.value(
+                    value: listings),
+              ],
+              child: ListingDetailScreen(listing: listing),
+            ),
+          ),
+        );
+      },
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(16),

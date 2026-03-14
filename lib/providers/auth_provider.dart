@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
 import '../services/auth_service.dart';
 import '../models/user_profile.dart';
 
@@ -8,6 +9,7 @@ enum AuthStatus { initial, loading, authenticated, unauthenticated, error }
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
+  late final StreamSubscription<User?> _authSub;
 
   AuthStatus _status = AuthStatus.initial;
   User? _user;
@@ -15,7 +17,7 @@ class AuthProvider extends ChangeNotifier {
   String? _errorMessage;
 
   AuthProvider(this._authService) {
-    _authService.authStateChanges.listen(_onAuthStateChanged);
+    _authSub = _authService.authStateChanges.listen(_onAuthStateChanged);
   }
 
   AuthStatus get status => _status;
@@ -137,6 +139,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   void clearError() {
+    if (_errorMessage == null) return;
     _errorMessage = null;
     notifyListeners();
   }
@@ -198,5 +201,11 @@ class AuthProvider extends ChangeNotifier {
       return 'Platform error (${e.code}): $details';
     }
     return 'Platform error: ${e.code}';
+  }
+
+  @override
+  void dispose() {
+    _authSub.cancel();
+    super.dispose();
   }
 }
