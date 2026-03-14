@@ -36,7 +36,7 @@ class AuthProvider extends ChangeNotifier {
     } else {
       _errorMessage = null;
       try {
-        _userProfile = await _authService.getUserProfile(user.uid);
+        _userProfile = await _authService.ensureUserProfileDocument(user);
       } catch (e) {
         debugPrint('Profile load failed: $e');
         _userProfile = null;

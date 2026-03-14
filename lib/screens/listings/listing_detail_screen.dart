@@ -105,7 +105,16 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
       comment: _reviewCtrl.text.trim(),
       createdAt: DateTime.now(),
     );
-    await context.read<ListingsProvider>().addReview(review);
+    final listings = context.read<ListingsProvider>();
+    final success = await listings.addReview(review);
+    if (!mounted) return;
+    if (!success) {
+      final message = listings.errorMessage ?? 'Failed to submit review.';
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+      return;
+    }
+
     if (mounted) {
       setState(() => _userRating = 0);
       _reviewCtrl.clear();

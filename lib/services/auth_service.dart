@@ -10,6 +10,22 @@ class AuthService {
   User? get currentUser => _auth.currentUser;
   bool get isEmailVerified => _auth.currentUser?.emailVerified ?? false;
 
+  UserProfile _buildUserProfile(User user) {
+    final normalizedEmail = (user.email ?? '').trim().toLowerCase();
+    final fallbackName = normalizedEmail.contains('@')
+        ? normalizedEmail.split('@').first
+        : 'Community User';
+
+    return UserProfile(
+      uid: user.uid,
+      email: normalizedEmail,
+      displayName: (user.displayName ?? '').trim().isNotEmpty
+          ? user.displayName!.trim()
+          : fallbackName,
+      createdAt: DateTime.now(),
+    );
+  }
+
   Future<UserCredential> signUp({
     required String email,
     required String password,
@@ -26,15 +42,6 @@ class AuthService {
       await cred.user?.updateDisplayName(displayName);
     } catch (_) {}
 
-    await _db.collection('users').doc(cred.user!.uid).set(
-          UserProfile(
-            uid: cred.user!.uid,
-            email: normalizedEmail,
-            displayName: displayName,
-            createdAt: DateTime.now(),
-          ).toFirestore(),
-        );
-
     final createdUser = cred.user;
     if (createdUser == null) {
       throw FirebaseAuthException(
@@ -42,6 +49,15 @@ class AuthService {
         message: 'Account was created but no authenticated user was returned.',
       );
     }
+
+    await _db.collection('users').doc(createdUser.uid).set(
+          UserProfile(
+            uid: createdUser.uid,
+            email: normalizedEmail,
+            displayName: displayName,
+            createdAt: DateTime.now(),
+          ).toFirestore(),
+        );
 
     await createdUser.sendEmailVerification();
 
@@ -74,6 +90,18 @@ class AuthService {
   Future<UserProfile?> getUserProfile(String uid) async {
     final doc = await _db.collection('users').doc(uid).get();
     return doc.exists ? UserProfile.fromFirestore(doc) : null;
+  }
+
+  Future<UserProfile> ensureUserProfileDocument(User user) async {
+    final ref = _db.collection('users').doc(user.uid);
+    final doc = await ref.get();
+    if (doc.exists) {
+      return UserProfile.fromFirestore(doc);
+    }
+
+    final profile = _buildUserProfile(user);
+    await ref.set(profile.toFirestore());
+    return profile;
   }
 
   Future<void> updateNotificationPreference(String uid, bool enabled) => _db
