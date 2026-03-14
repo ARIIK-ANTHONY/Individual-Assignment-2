@@ -151,7 +151,7 @@ I chose Provider because it integrates cleanly with Flutter's widget tree and ke
 
 6. Run on emulator or device:
   ```bash
-  flutter run -d emulator-5554
+  flutter run
   ```
 
 > The app is designed and tested for Android. Web execution is not supported.
@@ -159,14 +159,4 @@ I chose Provider because it integrates cleanly with Flutter's widget tree and ke
 ---
 
 ## Demo Video Coverage
-
-The 7–12 minute demo covers:
-
-1. Sign up → email verification → login
-2. Create a listing (coordinates auto-detected from device)
-3. Edit the listing, confirm change in Firestore Console
-4. Delete the listing, confirm removal in Firestore Console
-5. Search by name and filter by category
-6. Open a listing detail — show map marker coordinates from Firestore
-7. Launch Google Maps navigation from the detail page
-8. Walk through `listing_service.dart` → `listings_provider.dart` → `directory_screen.dart` to explain data flow
+Here is the link to my demo: https://youtu.be/Amx-bCuljJA?si=-My9ycOdu8BWrC4u
